@@ -13,7 +13,6 @@ import base64
 from apoio.curvaOMS import *
 import os
 
-# # Carregar dados de percentis (exemplo - substituir com seus dados reais)
 # wfa_percentiles_M = pd.read_csv('apoio/wfa_percentiles_M.csv')
 # wfa_percentiles_F = pd.read_csv('apoio/wfa_percentiles_F.csv')
 # lhfa_percentiles_M = pd.read_csv('apoio/lhfa_percentiles_M.csv')
@@ -104,32 +103,26 @@ def parse_data(contents):
     df = pd.read_excel(io.BytesIO(decoded), sheet_name='PUERICULTURA', skiprows=3)
     df.columns = df.columns.str.strip()
 
-    # Conferir se as colunas essenciais existem
     required_cols = ['DN', 'DATA AVALIAÇÃO', 'PESO', 'ESTATURA', 'SEXO', 'CONDUTA']
     for col in required_cols:
         if col not in df.columns:
             raise ValueError(f"Coluna obrigatória '{col}' não encontrada. Colunas disponíveis: {df.columns.tolist()}")
 
-    # Converter datas
     df['DN'] = pd.to_datetime(df['DN'], errors='coerce')
     df['DATA AVALIAÇÃO'] = pd.to_datetime(df['DATA AVALIAÇÃO'], errors='coerce')
 
-    # Calcular idade em meses
     df['Meses_ajus'] = (df['DATA AVALIAÇÃO'] - df['DN']).dt.days // 30
     if df['Meses_ajus'].isnull().all():
         raise ValueError("Não foi possível calcular 'Meses_ajus'. Verifique as datas no arquivo.")
 
-    # Padronizar conduta
     df['Conduta_ajus'] = np.where(
         df['CONDUTA'] == 'ACOMPANHAMENTO', 'Acompanhamento',
         np.where(df['CONDUTA'] == 'TTO MEDICAMENTOSO', 'Em tratamento medicamentoso', df['CONDUTA'])
     )
 
-    # Corrigir peso
     df['Peso_ajus'] = np.where(df['PESO'] > 1000, df['PESO']/1000, df['PESO'])
     df['IMC'] = df['Peso_ajus'] / ((df['ESTATURA']/100)**2)
 
-    # Categorias de idade
     conditions = [
         df['Meses_ajus'] <= 12,
         (df['Meses_ajus'] > 12) & (df['Meses_ajus'] <= 24),
@@ -140,21 +133,18 @@ def parse_data(contents):
     df['Idade_categ'] = np.select(conditions, choices, default='Desconhecido')
     df['Idade_categ'] = pd.Categorical(df['Idade_categ'], categories=choices + ['Desconhecido'], ordered=True)
 
-    # Corrigir nomes de colunas para PT, caso haja espaço
     if 'PT ' in df.columns and 'PT' not in df.columns:
         df = df.rename(columns={'PT ': 'PT'})
 
-    # Não filtrar linhas aqui! O filtro será feito no gráfico.
     return df
 
 def create_summary_table(df):
-    # Tabela de contagem por categoria de idade
+
     idade_categ = pd.crosstab(df['Idade_categ'], df['SEXO'], margins=True, margins_name='Overall')
     idade_categ_percent = idade_categ.div(idade_categ.loc['Overall'], axis=1).fillna(0) * 100
     idade_categ_fmt = idade_categ.astype(str) + ' (' + idade_categ_percent.round(1).astype(str) + '%)'
     idade_categ_fmt = idade_categ_fmt.drop('Overall')
 
-    # Estatísticas descritivas
     def mean_std(series):
         return f"{series.mean():.2f} ± {series.std():.2f}" if not series.isnull().all() else "-"
 
@@ -165,7 +155,6 @@ def create_summary_table(df):
             mean_std(df[df['SEXO']=='M'][var])
         ]
 
-    # Perímetros categóricos
     def cat_count(var):
         tab = pd.crosstab(df[var], df['SEXO'], margins=True, margins_name='Overall')
         tab_percent = tab.div(tab.loc['Overall'], axis=1).fillna(0) * 100
@@ -173,31 +162,30 @@ def create_summary_table(df):
         tab_fmt = tab_fmt.drop('Overall')
         return tab_fmt
 
-    # Montar tabela final
     rows = []
     rows.append(['Characteristic', 'Overall', 'F', 'M'])
-    # Idade categórica
+
     for idx, row in idade_categ_fmt.iterrows():
         rows.append([f'Idade: {idx}', row.get('Overall',''), row.get('F',''), row.get('M','')])
-    # Peso
+
     rows.append(['Peso', *stat_row('Peso_ajus')])
-    # Estatura
+
     rows.append(['Estatura', *stat_row('ESTATURA')])
-    # Perímetro Cefálico
+
     pc_tab = cat_count('PC')
     for idx, row in pc_tab.iterrows():
         rows.append([f'PC: {idx}', row.get('Overall',''), row.get('F',''), row.get('M','')])
-    # Perímetro Abdominal
+
     if 'PA' in df.columns:
         rows.append(['Perímetro Abdominal', *stat_row('PA')])
-    # Perímetro Torácico
+
     if 'PT' in df.columns:
         pt_tab = cat_count('PT')
         for idx, row in pt_tab.iterrows():
             rows.append([f'PT: {idx}', row.get('Overall',''), row.get('F',''), row.get('M','')])
-    # IMC
+
     rows.append(['IMC', *stat_row('IMC')])
-    # Montar DataTable
+
     return dash.dash_table.DataTable(
         columns=[{"name": i, "id": i} for i in rows[0]],
         data=[dict(zip(rows[0], r)) for r in rows[1:]],
@@ -218,10 +206,10 @@ def update_summary(contents):
 
 def create_plot(percentile_df, data_df, x_col, y_col, title, x_title, y_title, gender):
     fig = go.Figure()
-    # Detectar se é gráfico de peso vs estatura
+
     is_peso_est = x_col == 'ESTATURA'
     x_percentil = 'Length' if is_peso_est else 'Idade_meses'
-    # Cores distintas para cada percentil
+
     percentil_cores = {
         'P3': 'red',
         'P15': 'orange',
@@ -236,7 +224,7 @@ def create_plot(percentile_df, data_df, x_col, y_col, title, x_title, y_title, g
             mode='lines', name=percentile,
             line=dict(color=percentil_cores.get(percentile, 'grey'), width=2)
         ))
-    # Adicionar pontos de dados
+
     if gender == 'M':
         filtered_df = data_df[data_df['SEXO'] == 'M']
     else:
@@ -269,8 +257,7 @@ def create_plot(percentile_df, data_df, x_col, y_col, title, x_title, y_title, g
     )
     return fig
 
-# Callbacks para cada gráfico seguiriam o mesmo padrão...
-# Exemplo para curva Peso vs Idade - Meninos:
+#Callbacks para cada gráfico
 @app.callback(
     Output('curva-peso-id-m', 'figure'),
     Input('upload-data', 'contents')
@@ -473,7 +460,6 @@ def show_uploaded_file_info(contents, filename):
     if contents is None or filename is None:
         return "Nenhum arquivo carregado."
     try:
-        # Calcular tamanho do arquivo a partir do base64
         content_type, content_string = contents.split(',')
         decoded = base64.b64decode(content_string)
         file_size_kb = len(decoded) / 1024

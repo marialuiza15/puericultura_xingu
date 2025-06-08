@@ -98,6 +98,8 @@ app.layout = dbc.Container([
 ])
 
 def parse_data(contents):
+    """Lê o arquivo enviado, processa e retorna o DataFrame pronto para análise."""
+
     content_type, content_string = contents.split(',')
     decoded = base64.b64decode(content_string)
     df = pd.read_excel(io.BytesIO(decoded), sheet_name='PUERICULTURA', skiprows=3)
@@ -139,6 +141,7 @@ def parse_data(contents):
     return df
 
 def create_summary_table(df):
+    """Gera a tabela descritiva com estatísticas e frequências para a aba Descritivas."""
 
     idade_categ = pd.crosstab(df['Idade_categ'], df['SEXO'], margins=True, margins_name='Overall')
     idade_categ_percent = idade_categ.div(idade_categ.loc['Overall'], axis=1).fillna(0) * 100
@@ -199,12 +202,15 @@ def create_summary_table(df):
     Input('upload-data', 'contents')
 )
 def update_summary(contents):
+    """Callback: atualiza a tabela descritiva ao receber novo arquivo."""
+
     if contents is None:
         return []
     df = parse_data(contents)
     return create_summary_table(df)
 
 def create_plot(percentile_df, data_df, x_col, y_col, title, x_title, y_title, gender):
+    """Cria o gráfico de percentis e dados individuais para cada curva antropométrica."""
     fig = go.Figure()
 
     is_peso_est = x_col == 'ESTATURA'
@@ -263,6 +269,8 @@ def create_plot(percentile_df, data_df, x_col, y_col, title, x_title, y_title, g
     Input('upload-data', 'contents')
 )
 def update_peso_id_m(contents):
+    """Callback: atualiza o gráfico Peso vs Idade - Meninos."""
+
     if contents is None:
         return go.Figure()
     try:
@@ -284,6 +292,8 @@ def update_peso_id_m(contents):
     Input('upload-data', 'contents')
 )
 def update_peso_id_f(contents):
+    """Callback: atualiza o gráfico Peso vs Idade - Meninas."""
+
     if contents is None:
         return go.Figure()
     try:
@@ -303,6 +313,8 @@ def update_peso_id_f(contents):
     Input('upload-data', 'contents')
 )
 def update_estatura_id_m(contents):
+    """Callback: atualiza o gráfico Estatura vs Idade - Meninos."""
+
     if contents is None:
         return go.Figure()
     try:
@@ -322,6 +334,8 @@ def update_estatura_id_m(contents):
     Input('upload-data', 'contents')
 )
 def update_estatura_id_f(contents):
+    """Callback: atualiza o gráfico Estatura vs Idade - Meninas."""
+
     if contents is None:
         return go.Figure()
     try:
@@ -341,6 +355,8 @@ def update_estatura_id_f(contents):
     Input('upload-data', 'contents')
 )
 def update_imc_id_m(contents):
+    """Callback: atualiza o gráfico IMC vs Idade - Meninos."""
+
     if contents is None:
         return go.Figure()
     try:
@@ -360,6 +376,8 @@ def update_imc_id_m(contents):
     Input('upload-data', 'contents')
 )
 def update_imc_id_f(contents):
+    """Callback: atualiza o gráfico IMC vs Idade - Meninas."""
+
     if contents is None:
         return go.Figure()
     try:
@@ -379,6 +397,8 @@ def update_imc_id_f(contents):
     Input('upload-data', 'contents')
 )
 def update_pc_id_m(contents):
+    """Callback: atualiza o gráfico Perímetro Cefálico vs Idade - Meninos."""
+
     if contents is None:
         return go.Figure()
     try:
@@ -398,6 +418,8 @@ def update_pc_id_m(contents):
     Input('upload-data', 'contents')
 )
 def update_pc_id_f(contents):
+    """Callback: atualiza o gráfico Perímetro Cefálico vs Idade - Meninas."""
+
     if contents is None:
         return go.Figure()
     try:
@@ -417,6 +439,8 @@ def update_pc_id_f(contents):
     Input('upload-data', 'contents')
 )
 def update_peso_est_m(contents):
+    """Callback: atualiza o gráfico Peso vs Estatura - Meninos."""
+
     if contents is None:
         return go.Figure()
     try:
@@ -437,6 +461,8 @@ def update_peso_est_m(contents):
     Input('upload-data', 'contents')
 )
 def update_peso_est_f(contents):
+    """Callback: atualiza o gráfico Peso vs Estatura - Meninas."""
+
     if contents is None:
         return go.Figure()
     try:
@@ -457,6 +483,8 @@ def update_peso_est_f(contents):
     State('upload-data', 'filename')
 )
 def show_uploaded_file_info(contents, filename):
+    """Callback: exibe nome e tamanho do arquivo recebido na aba Controle."""
+    
     if contents is None or filename is None:
         return "Nenhum arquivo carregado."
     try:
